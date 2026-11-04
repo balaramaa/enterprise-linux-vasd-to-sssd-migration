@@ -1,0 +1,21 @@
+---
+- name: Enterprise VAS to SSSD Migration Orchestration
+  hosts: all
+  become: yes
+  strategy: linear
+  
+  roles:
+    - role: preflight_audit
+      tags: [preflight]
+      
+    - role: sssd_stage
+      tags: [stage]
+      
+    - role: ad_join
+      tags: [join]
+      
+    - role: cutover
+      tags: [cutover]
+      
+    - role: validate
+      tags: [validate]
