@@ -1,0 +1,57 @@
+---
+- name: Check the SSSD domain is online
+  ansible.builtin.command: "sssctl domain-status {{ ad_domain }} --online"
+  register: sss_status
+  changed_when: false
+  failed_when: "'Online status: Online' not in sss_status.stdout"
+
+- name: Re-resolve every snapshot identity under SSSD
+  ansible.builtin.command:
+    cmd: >-
+      {{ ansible_python.executable }} {{ migration_state_dir }}/snapshot_identities.py
+      --users-from {{ migration_state_dir }}/identities.pre
+      --out {{ migration_state_dir }}/identities.post
+  changed_when: false
+
+- name: Zero-tolerance identity diff (UID, GID, home, shell)
+  ansible.builtin.command: "diff -u {{ migration_state_dir }}/identities.pre {{ migration_state_dir }}/identities.post"
+  changed_when: false
+
+- name: Check an allowed user passes the PAM account check
+  ansible.builtin.command: "sssctl user-checks {{ validation_allow_user }} -a acct"
+  register: allow_check
+  changed_when: false
+  failed_when: "'pam_acct_mgmt: Success' not in allow_check.stdout"
+  when: validation_allow_user | length > 0
+
+- name: Check a denied user fails the PAM account check
+  ansible.builtin.command: "sssctl user-checks {{ validation_deny_user }} -a acct"
+  register: deny_check
+  changed_when: false
+  failed_when: "'pam_acct_mgmt: Success' in deny_check.stdout"
+  when: validation_deny_user | length > 0
+
+- name: Read sudo rules for the validation user
+  ansible.builtin.command: "sudo -l -U {{ validation_sudo_user }}"
+  register: sudo_post
+  changed_when: false
+  when: validation_sudo_user | length > 0
+
+- name: Read sudo rules recorded before migration
+  ansible.builtin.slurp:
+    src: "{{ migration_state_dir }}/sudo.pre"
+  register: sudo_pre
+  when: validation_sudo_user | length > 0
+
+- name: Check sudo rules are unchanged
+  ansible.builtin.assert:
+    that:
+      - (sudo_pre.content | b64decode | trim) == (sudo_post.stdout | trim)
+    fail_msg: "sudo rules for {{ validation_sudo_user }} changed after cutover"
+  when: validation_sudo_user | length > 0
+
+- name: Mark the host as verified (starts the soak period)
+  ansible.builtin.copy:
+    content: "{{ ansible_date_time.iso8601 }}\n"
+    dest: "{{ migration_state_dir }}/VERIFIED"
+    mode: "0600"

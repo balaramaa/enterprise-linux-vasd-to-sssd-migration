@@ -1,0 +1,48 @@
+---
+# --- Active Directory --------------------------------------------------------
+ad_domain: corp.example.com
+ad_realm: "{{ ad_domain | upper }}"
+
+# Account used by adcli to join hosts. Keep the password in vault.yml.
+ad_join_user: svc-linux-join
+ad_join_password: "{{ vault_ad_join_password }}"
+
+# Account used by vastool if a host must be rolled back to VAS.
+vas_join_user: svc-linux-join
+vas_join_password: "{{ vault_vas_join_password }}"
+vastool: /opt/quest/bin/vastool
+
+# --- SSSD (C1, C4) -----------------------------------------------------------
+# "ad" uses AD Group Policy logon rights; "simple" uses an explicit group list.
+sssd_access_provider: ad
+# Decide this explicitly. "permissive" logs GPO denials without enforcing them.
+ad_gpo_access_control: permissive
+simple_allow_groups: []
+
+# --- Credential caches (C3) --------------------------------------------------
+# Keep FILE ticket caches during the transition so live sessions still find
+# their tickets. Set to false to accept the RHEL 8/9 KCM default.
+preserve_file_ccache: true
+
+# --- Pre-flight ---------------------------------------------------------------
+migration_state_dir: /var/tmp/vas2sssd
+max_clock_skew_seconds: 300        # Kerberos default tolerance
+min_free_mb: 500
+snapshot_days: 60                   # login look-back for the identity snapshot
+snapshot_extra_users: []            # always-check accounts, e.g. service users
+break_glass_user: breakglass        # local account that must exist before cutover
+
+# --- Validation (optional checks run only when set) ---------------------------
+validation_allow_user: ""           # AD user who must be allowed to log in
+validation_deny_user: ""            # AD user who must be denied
+validation_sudo_user: ""            # AD user whose sudo rules must not change
+
+# --- Waves ---------------------------------------------------------------------
+migration_batch_size: "10%"
+wave_max_fail_percentage: 2
+
+# --- Decommission ---------------------------------------------------------------
+soak_days: 7
+vas_packages:
+  - vasclnt
+  - vasgp

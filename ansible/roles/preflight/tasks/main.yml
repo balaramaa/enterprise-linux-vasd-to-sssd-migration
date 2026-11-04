@@ -1,0 +1,83 @@
+---
+- name: Confirm a supported RHEL release (7, 8, or 9)
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "RedHat"
+      - ansible_distribution_major_version in ["7", "8", "9"]
+    fail_msg: "Unsupported OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+- name: Create the migration state directory
+  ansible.builtin.file:
+    path: "{{ migration_state_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Read clock offset from chrony
+  ansible.builtin.command: chronyc tracking
+  register: chrony
+  changed_when: false
+
+- name: Check clock skew is within the Kerberos tolerance
+  ansible.builtin.assert:
+    that:
+      - skew | float < max_clock_skew_seconds | float
+    fail_msg: "Clock skew {{ skew }}s exceeds {{ max_clock_skew_seconds }}s"
+  vars:
+    skew: "{{ chrony.stdout | regex_search('System time\\s*:\\s*([0-9.]+)', '\\1') | first }}"
+
+- name: Read free space in /var
+  ansible.builtin.command: df -Pm /var
+  register: var_df
+  changed_when: false
+
+- name: Check free disk space
+  ansible.builtin.assert:
+    that:
+      - (var_df.stdout_lines[-1].split()[3] | int) >= min_free_mb
+    fail_msg: "Less than {{ min_free_mb }} MB free in /var"
+
+- name: Check a domain controller is reachable (Kerberos and LDAP)
+  ansible.builtin.wait_for:
+    host: "{{ ad_domain }}"
+    port: "{{ item }}"
+    timeout: 10
+  loop: [88, 389]
+
+- name: Check the local break-glass account exists
+  ansible.builtin.command: "getent -s files passwd {{ break_glass_user }}"
+  changed_when: false
+
+- name: Check VAS is healthy before changing anything
+  ansible.builtin.command: "{{ vastool }} status"
+  changed_when: false
+
+- name: Back up authentication configuration for rollback
+  ansible.builtin.command:
+    cmd: >-
+      tar -czf {{ migration_state_dir }}/pre-migration-auth.tar.gz
+      -C / etc/nsswitch.conf etc/pam.d etc/krb5.conf etc/krb5.conf.d
+    creates: "{{ migration_state_dir }}/pre-migration-auth.tar.gz"
+
+- name: Copy the identity snapshot script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/files/snapshot_identities.py"
+    dest: "{{ migration_state_dir }}/snapshot_identities.py"
+    mode: "0700"
+
+- name: Snapshot how recent AD identities resolve under VAS
+  ansible.builtin.command:
+    cmd: >-
+      {{ ansible_python.executable }} {{ migration_state_dir }}/snapshot_identities.py
+      --days {{ snapshot_days }}
+      --extra "{{ snapshot_extra_users | join(',') }}"
+      --out {{ migration_state_dir }}/identities.pre
+    creates: "{{ migration_state_dir }}/identities.pre"
+  register: snapshot
+
+- name: Record sudo rules for the validation user
+  ansible.builtin.shell: "sudo -l -U {{ validation_sudo_user }} > {{ migration_state_dir }}/sudo.pre"
+  args:
+    creates: "{{ migration_state_dir }}/sudo.pre"
+  when: validation_sudo_user | length > 0

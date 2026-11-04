@@ -1,0 +1,40 @@
+---
+# Migrate hosts from VAS to SSSD. Run one wave (inventory group) at a time:
+#   ansible-playbook site.yml --limit canary --ask-vault-pass
+- name: Migrate VAS to SSSD
+  hosts: all
+  become: true
+  serial: "{{ migration_batch_size }}"
+  max_fail_percentage: "{{ wave_max_fail_percentage }}"
+
+  tasks:
+    - name: Pre-flight checks and identity snapshot
+      ansible.builtin.import_role:
+        name: preflight
+
+    - name: Stage SSSD (installed and configured, not enabled)
+      ansible.builtin.import_role:
+        name: sssd_stage
+
+    - name: Join, cut over, and validate, rolling back to VAS on any failure
+      block:
+        - name: Join AD with adcli
+          ansible.builtin.import_role:
+            name: ad_join
+
+        - name: Switch NSS and PAM to SSSD
+          ansible.builtin.import_role:
+            name: cutover
+
+        - name: Validate identities and access
+          ansible.builtin.import_role:
+            name: validate
+
+      rescue:
+        - name: Roll back to VAS
+          ansible.builtin.include_role:
+            name: rollback
+
+        - name: Report the failed host
+          ansible.builtin.fail:
+            msg: "Migration failed on {{ inventory_hostname }}; host was rolled back to VAS."

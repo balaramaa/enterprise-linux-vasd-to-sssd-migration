@@ -1,0 +1,34 @@
+---
+# C2: AD keeps one password per computer account. adcli resets it, which makes
+# the VAS keytab invalid, so VAS is stopped first and rollback must rejoin VAS.
+# VAS is not unjoined: "vastool unjoin" can remove the AD computer object.
+- name: Stop and disable the VAS daemon
+  ansible.builtin.service:
+    name: vasd
+    state: stopped
+    enabled: false
+
+- name: Join AD with adcli, reusing the existing computer object
+  ansible.builtin.command:
+    cmd: >-
+      adcli join --domain={{ ad_domain }}
+      --login-user={{ ad_join_user }} --stdin-password
+      --os-name="{{ ansible_distribution }}"
+      --os-version="{{ ansible_distribution_version }}"
+    stdin: "{{ ad_join_password }}"
+  no_log: true
+
+- name: Check the new host keytab
+  ansible.builtin.command: klist -k /etc/krb5.keytab
+  changed_when: false
+
+- name: Check the machine account can get a Kerberos ticket
+  ansible.builtin.command: >-
+    kinit -k -c FILE:{{ migration_state_dir }}/join_test.ccache
+    {{ ansible_hostname[:15] | upper }}$@{{ ad_realm }}
+  changed_when: false
+
+- name: Remove the test ticket cache
+  ansible.builtin.file:
+    path: "{{ migration_state_dir }}/join_test.ccache"
+    state: absent

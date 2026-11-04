@@ -1,0 +1,21 @@
+---
+- name: Install SSSD and AD join tools
+  ansible.builtin.package:
+    name: "{{ common + (['authconfig'] if ansible_distribution_major_version == '7' else ['authselect']) }}"
+    state: present
+  vars:
+    common: [sssd, adcli, realmd, oddjob, oddjob-mkhomedir, krb5-workstation]
+
+- name: Render sssd.conf with AD POSIX attributes and explicit access control (C1, C4)
+  ansible.builtin.template:
+    src: sssd.conf.j2
+    dest: /etc/sssd/sssd.conf
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Keep SSSD stopped until cutover
+  ansible.builtin.service:
+    name: sssd
+    state: stopped
+    enabled: false

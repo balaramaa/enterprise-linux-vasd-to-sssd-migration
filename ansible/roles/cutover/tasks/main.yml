@@ -1,0 +1,51 @@
+---
+# C5: NSS and PAM are switched in a single call to keep the gap short.
+- name: Switch NSS and PAM to SSSD (RHEL 8/9)
+  ansible.builtin.command: authselect select sssd with-mkhomedir --force
+  when: ansible_distribution_major_version != "7"
+
+- name: Switch NSS and PAM to SSSD (RHEL 7)
+  ansible.builtin.command: authconfig --enablesssd --enablesssdauth --enablemkhomedir --update
+  when: ansible_distribution_major_version == "7"
+
+- name: Read nsswitch.conf
+  ansible.builtin.command: grep -E '^(passwd|group|shadow):' /etc/nsswitch.conf
+  register: nss_lines
+  changed_when: false
+
+- name: Check VAS is no longer in the NSS lookup path
+  ansible.builtin.assert:
+    that:
+      - "'vas' not in nss_lines.stdout"
+      - "'sss' in nss_lines.stdout"
+    fail_msg: "nsswitch.conf still references VAS or lacks sss: {{ nss_lines.stdout_lines }}"
+
+# C3: keep FILE ticket caches so live sessions still find their tickets.
+- name: Set FILE ticket caches in krb5.conf [libdefaults]
+  ansible.builtin.lineinfile:
+    path: /etc/krb5.conf
+    regexp: '^\s*default_ccache_name\s*='
+    line: "    default_ccache_name = FILE:/tmp/krb5cc_%{uid}"
+    insertafter: '^\[libdefaults\]'
+  when: preserve_file_ccache | bool
+
+- name: Check for the RHEL 8/9 KCM drop-in
+  ansible.builtin.stat:
+    path: /etc/krb5.conf.d/kcm_default_ccache
+  register: kcm_dropin
+  when: preserve_file_ccache | bool
+
+- name: Override the KCM default so it does not take precedence
+  ansible.builtin.lineinfile:
+    path: /etc/krb5.conf.d/kcm_default_ccache
+    regexp: '^\s*default_ccache_name\s*='
+    line: "    default_ccache_name = FILE:/tmp/krb5cc_%{uid}"
+  when:
+    - preserve_file_ccache | bool
+    - kcm_dropin.stat.exists | default(false)
+
+- name: Start and enable SSSD
+  ansible.builtin.service:
+    name: sssd
+    state: started
+    enabled: true

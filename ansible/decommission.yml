@@ -1,0 +1,8 @@
+---
+# Remove VAS from hosts that passed validation at least soak_days ago:
+#   ansible-playbook decommission.yml --limit non_prod
+- name: Decommission VAS after the soak period
+  hosts: all
+  become: true
+  roles:
+    - vas_remove

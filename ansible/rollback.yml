@@ -1,0 +1,8 @@
+---
+# Manually roll hosts back to VAS:
+#   ansible-playbook rollback.yml --limit <host> --ask-vault-pass
+- name: Roll back hosts to VAS
+  hosts: all
+  become: true
+  roles:
+    - rollback

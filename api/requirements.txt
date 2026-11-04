@@ -1,0 +1,5 @@
+fastapi==0.110.0
+uvicorn==0.28.0
+pydantic==2.6.4
+ansible-runner==2.3.6
+ansible-core>=2.14,<2.17

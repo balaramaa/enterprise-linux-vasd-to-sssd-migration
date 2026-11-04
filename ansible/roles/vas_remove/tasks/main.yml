@@ -1,0 +1,25 @@
+---
+- name: Read the verified marker
+  ansible.builtin.stat:
+    path: "{{ migration_state_dir }}/VERIFIED"
+  register: verified
+
+- name: Refuse to remove VAS before validation and the soak period
+  ansible.builtin.assert:
+    that:
+      - verified.stat.exists
+      - (ansible_date_time.epoch | int) - (verified.stat.mtime | int) >= soak_days * 86400
+    fail_msg: "Host not verified, or verified less than {{ soak_days }} days ago."
+
+- name: Remove VAS packages
+  ansible.builtin.package:
+    name: "{{ vas_packages }}"
+    state: absent
+
+- name: Remove leftover VAS configuration and cache
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/opt/quest/vas
+    - /var/opt/quest/vas

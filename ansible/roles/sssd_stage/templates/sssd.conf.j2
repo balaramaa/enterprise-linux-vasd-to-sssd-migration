@@ -1,0 +1,29 @@
+# Managed by Ansible (sssd_stage role).
+[sssd]
+services = nss, pam
+config_file_version = 2
+domains = {{ ad_domain }}
+
+[domain/{{ ad_domain }}]
+id_provider = ad
+auth_provider = ad
+chpass_provider = ad
+ad_domain = {{ ad_domain }}
+krb5_realm = {{ ad_realm }}
+realmd_tags = manages-system joined-with-adcli
+cache_credentials = True
+
+# C1: use the uidNumber/gidNumber/homeDirectory/loginShell already in AD,
+# so every identity resolves exactly as it did under VAS.
+ldap_id_mapping = False
+use_fully_qualified_names = False
+fallback_homedir = /home/%u
+default_shell = /bin/bash
+
+# C4: access control is set explicitly, never left to the default.
+access_provider = {{ sssd_access_provider }}
+{% if sssd_access_provider == 'ad' %}
+ad_gpo_access_control = {{ ad_gpo_access_control }}
+{% elif sssd_access_provider == 'simple' %}
+simple_allow_groups = {{ simple_allow_groups | join(', ') }}
+{% endif %}
