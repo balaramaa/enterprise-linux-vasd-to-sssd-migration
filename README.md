@@ -2,9 +2,11 @@
 
 An open-source orchestration framework for moving Red Hat Enterprise Linux (RHEL 7, 8, and 9) server fleets from commercial One Identity Authentication Services (VAS, `vasd`) to the native, open-source System Security Services Daemon (SSSD), with zero identity drift and near-zero disruption.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24043076.svg)](https://doi.org/10.5281/zenodo.24043076)
+
 This repository is the reference implementation for the paper:
 
-> B. Alti, "Transitioning Enterprise Linux Authentication at Scale: Migrating from Commercial VAS to Native SSSD Architecture with Near-Zero Disruption," preprint, 2026.
+> B. Alti, "Transitioning Enterprise Linux Authentication at Scale: Migrating from Commercial VAS to Native SSSD Architecture with Near-Zero Disruption," Zenodo, preprint, 2026. [doi:10.5281/zenodo.24043076](https://doi.org/10.5281/zenodo.24043076)
 
 ## Features
 
@@ -124,6 +126,22 @@ python3 -m unittest discover -s tests -t .
 ## Disclaimer
 
 This is an independent project. It is not affiliated with, endorsed by, or supported by One Identity, Red Hat, or the author's employer. Product names are trademarks of their respective owners. Test in a non-production environment before use. Use at your own risk.
+
+## Citation
+
+If you use this framework, please cite the paper:
+
+```bibtex
+@misc{alti2026vas2sssd,
+  author    = {Alti, Balaramakrishna},
+  title     = {Transitioning Enterprise Linux Authentication at Scale: Migrating from Commercial {VAS} to Native {SSSD} Architecture with Near-Zero Disruption},
+  year      = {2026},
+  publisher = {Zenodo},
+  note      = {Preprint},
+  doi       = {10.5281/zenodo.24043076},
+  url       = {https://doi.org/10.5281/zenodo.24043076}
+}
+```
 
 ## License
 

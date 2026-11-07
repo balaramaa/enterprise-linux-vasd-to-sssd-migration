@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "Enterprise Linux Automated Migration Framework: VAS to SSSD"
+authors:
+  - family-names: Alti
+    given-names: Balaramakrishna
+repository-code: "https://github.com/balaramaa/enterprise-linux-vasd-to-sssd-migration"
+license: MIT
+preferred-citation:
+  type: article
+  title: "Transitioning Enterprise Linux Authentication at Scale: Migrating from Commercial VAS to Native SSSD Architecture with Near-Zero Disruption"
+  authors:
+    - family-names: Alti
+      given-names: Balaramakrishna
+  year: 2026
+  publisher:
+    name: Zenodo
+  doi: "10.5281/zenodo.24043076"
+  url: "https://doi.org/10.5281/zenodo.24043076"
